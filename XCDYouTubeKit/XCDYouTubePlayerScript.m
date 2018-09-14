@@ -68,18 +68,25 @@
 		XCDYouTubeLogWarning(@"Unexpected player script (no anonymous function found)");
 	}
 	
-	NSRegularExpression *signatureRegularExpression = [NSRegularExpression regularExpressionWithPattern:@"[\"']signature[\"']\\s*,\\s*([^\\(]+)" options:NSRegularExpressionCaseInsensitive error:NULL];
-	for (NSTextCheckingResult *signatureResult in [signatureRegularExpression matchesInString:script options:(NSMatchingOptions)0 range:NSMakeRange(0, script.length)])
+	NSArray *patterns = @[
+		@"[\"']signature[\"']\\s*,\\s*([^\\(]+)",
+		@"(\\w+)\\s*=\\s*function\\((\\w+)\\).\\s*\\2=\\s*\\2\\.split\\(\"\"\\)\\s*;"
+	];
+	for (NSString *pattern in patterns)
 	{
-		NSString *signatureFunctionName = signatureResult.numberOfRanges > 1 ? [script substringWithRange:[signatureResult rangeAtIndex:1]] : nil;
-		if (!signatureFunctionName)
-			continue;
-		
-		JSValue *signatureFunction = self.context[signatureFunctionName];
-		if (signatureFunction.isObject)
+		NSRegularExpression *signatureRegularExpression = [NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:NULL];
+		NSArray<NSTextCheckingResult *> *signatureResults = [signatureRegularExpression matchesInString:script options:(NSMatchingOptions)0 range:NSMakeRange(0, script.length)];
+		for (NSTextCheckingResult *signatureResult in signatureResults)
 		{
-			_signatureFunction = signatureFunction;
-			break;
+			NSString *signatureFunctionName = signatureResult.numberOfRanges > 1 ? [script substringWithRange:[signatureResult rangeAtIndex:1]] : nil;
+			if (!signatureFunctionName) continue;
+			
+			JSValue *signatureFunction = self.context[signatureFunctionName];
+			if (signatureFunction.isObject)
+			{
+				_signatureFunction = signatureFunction;
+				return self;
+			}
 		}
 	}
 	
